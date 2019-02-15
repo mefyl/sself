@@ -1,0 +1,4 @@
+FROM alpine:latest
+
+RUN apk --no-cache add curl git make
+RUN curl https://download.docker.com/linux/static/stable/x86_64/docker-18.09.2.tgz | tar -xz docker/docker --strip-components 1 -C /usr/bin

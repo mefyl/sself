@@ -1,0 +1,26 @@
+stages:
+  - docker
+
+before_script:
+  - TAG=$(git describe)
+  - docker --config "$PWD/.docker" login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+
+Load Balancer:
+  stage: docker
+  image: registry.gitlab.gruntech.org/mefyl/sself/ci
+  script:
+    - IMAGE="$CI_REGISTRY/mefyl/sself/lb"
+    - NAME="$IMAGE:$TAG"
+    - make DOCKER_REPOSITORY=registry.gitlab.gruntech.org/mefyl/sself/ DOCKER_TAG=$TAG image/lb
+    - if ! docker --config "$PWD/.docker" push "$NAME"; then docker rmi "$NAME"; exit 1; fi
+    - docker rmi "$NAME"
+
+Certbot:
+  stage: docker
+  image: registry.gitlab.gruntech.org/mefyl/sself/ci
+  script:
+    - IMAGE="$CI_REGISTRY/mefyl/sself/certbot"
+    - NAME="$IMAGE:$TAG"
+    - make DOCKER_REPOSITORY=registry.gitlab.gruntech.org/mefyl/sself/ DOCKER_TAG=$TAG image/certbot
+    - if ! docker --config "$PWD/.docker" push "$NAME"; then docker rmi "$NAME"; exit 1; fi
+    - docker rmi "$NAME"
