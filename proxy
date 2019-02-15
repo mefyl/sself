@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+
+import itertools
+import os
+import os.path
+import requests
+import subprocess
+import sys
+import time
+
+def configuration():
+  with open('/etc/sself.yml') as f:
+    import yaml
+    res = yaml.load(f)
+  certbot = res.setdefault('certbot', {})
+  certbot.setdefault('host', 'sself-certbot')
+  certbot.setdefault('port', 80)
+  return res
+
+def log(msg, **kwargs):
+  print('{}: {}'.format(sys.argv[0], msg), **kwargs)
+
+def run(cmd):
+  log('running {}'.format(' '.join(cmd)))
+  subprocess.check_call(cmd)
+
+letsencrypt_template = '''\
+server {{
+  listen 80;
+  server_name {hostnames};
+  access_log /dev/stdout;
+  error_log /dev/stdout info;
+  location ~ ^/.well-known {{
+    proxy_pass http://{certbot[host]}:{certbot[port]};
+  }}
+  autoindex off;
+  location = / {{
+    return 301 https://$host$request_uri;
+  }}
+}}'''
+
+service_template = '''\
+server {{
+  listen 443 ssl;
+  server_name {hostname};
+  access_log /dev/stdout;
+  error_log /dev/stdout info;
+  ssl_certificate /etc/letsencrypt/live/{hostname}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/{hostname}/privkey.pem;
+  location / {{
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass http://{backend}:{port};
+  }}
+}}'''
+
+def main():
+  cfg = configuration()
+  with open('/etc/nginx/conf.d/letsencrypt.conf', 'w') as f:
+    print(letsencrypt_template.format(
+      hostnames = ' '.join(*itertools.chain(s['hosts']
+                                            for s in cfg['domains'].values())),
+      **cfg,
+    ), file = f)
+  nginx = subprocess.Popen(['nginx', '-g', 'daemon off;'])
+  while True:
+    for service, c in cfg['domains'].items():
+      for h in c['hosts']:
+        url = 'http://{}/.well-known'.format(h)
+        while True:
+          try:
+            r = requests.get(url)
+            if r.status_code == 200:
+              break
+          except requests.exceptions.RequestException as e:
+            r = e
+          log('waiting for {} to be up: {}'.format(url, r))
+          time.sleep(5)
+        for f in ['fullchain', 'privkey']:
+          path = '{}/{}.pem'.format(h, f)
+          r = requests.get(
+            'http://{certbot[host]}:{certbot[port]}/{path}'.format(
+              path = path,
+              **cfg))
+          if r.status_code != 200:
+            raise Exception('unable to fetch {}: {}', path, r.content)
+          fullpath = '/etc/letsencrypt/live/{}'.format(path)
+          d = os.path.dirname(fullpath)
+          if not os.path.exists(d):
+            os.makedirs(d)
+          with open(fullpath, 'wb') as o:
+            o.write(r.content)
+        with open('/etc/nginx/conf.d/{}.conf'.format(h), 'w') as f:
+          print(service_template.format(
+            hostname = h,
+            backend = service,
+            port = c.get('port', 80)), file = f)
+    run(['nginx', '-s', 'reload'])
+    try:
+      exit(nginx.wait())
+    except subprocess.TimeoutExpired:
+      log('refreshing certificates')
+
+try:
+  main()
+except Exception as e:
+  log('fatal error: {}'.format(e), file = sys.stderr)
+  exit(1)

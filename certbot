@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+
+import bottle
+import os
+import subprocess
+import sys
+
+EMAIL = os.environ.get('EMAIL')
+
+if EMAIL is None:
+  print('{}: define an EMAIL environment variable'.format(sys.argv[0]),
+        file = sys.stderr)
+  exit(1)
+
+def run(cmd):
+  print('{}: running {}'.format(sys.argv[0], ' '.join(cmd)))
+  subprocess.check_call(cmd)
+
+run(['crond'])
+
+@bottle.error(404)
+def not_found(error):
+  return None
+
+@bottle.route('/.well-known')
+def beacon():
+  return None
+
+@bottle.route('/.well-known/<path:path>')
+def challenges(path):
+  return bottle.static_file(path, root = '/var/www/letsencrypt/.well-known')
+
+@bottle.route('/.well-known/<path:path>')
+def challenges(path):
+  return bottle.static_file(path, root = '/var/www/letsencrypt/.well-known')
+
+@bottle.route('/<hostname>/<file>.pem')
+def get(hostname, file):
+  root = '/etc/letsencrypt/live'
+  if file not in ['fullchain', 'privkey']:
+    raise bottle.HTTPError(status = 404)
+  if not os.path.exists('{}/{}/{}.pem'.format(root, hostname, file)):
+    run([
+      'certbot', 'certonly',
+      '--webroot', '-w', '/var/www/letsencrypt', '-d', hostname,
+      '--non-interactive', '--agree-tos', '--email', EMAIL,
+    ])
+  return bottle.static_file(
+    '{}/{}.pem'.format(hostname, file), root = root)
+
+from cheroot.wsgi import WSGIServer
+
+server = WSGIServer(
+    ('0.0.0.0', 80),
+    bottle.default_app(),
+    server_name='certbot',
+    numthreads=64)
+
+try:
+    server.start()
+except KeyboardInterrupt:
+    server.stop()
