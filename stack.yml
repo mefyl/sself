@@ -1,0 +1,42 @@
+version: "3.5"
+
+networks:
+  certbot:
+  lb:
+
+configs:
+  sself.yml:
+    external: true
+  mail-aliases:
+    external: true
+
+volumes:
+  letsencrypt-certificates:
+
+services:
+  lb:
+    image: registry.gitlab.gruntech.org/mefyl/sself/lb:latest
+    deploy:
+      replicas: 3
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - certbot
+      - lb
+    configs:
+      - source: sself.yml
+        target: /etc/sself.yml
+  certbot:
+    image: registry.gitlab.gruntech.org/mefyl/sself/certbot:latest
+    deploy:
+      replicas: 1
+    networks:
+      - certbot
+    volumes:
+      - type: volume
+        source: letsencrypt-certificates
+        target: /etc/letsencrypt
+    configs:
+      - source: mail-aliases
+        target: /etc/mail/aliases

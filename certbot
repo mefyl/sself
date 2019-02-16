@@ -6,10 +6,20 @@ import subprocess
 import sys
 import threading
 
-EMAIL = os.environ.get('EMAIL')
+EMAIL = None
+
+aliases = '/etc/mail/aliases'
+try:
+  with open(aliases) as f:
+    for line in f:
+      if 'root:' in line:
+        EMAIL = line.split(':')[1].strip()
+except Exception:
+  pass
 
 if EMAIL is None:
-  print('{}: define an EMAIL environment variable'.format(sys.argv[0]),
+  print('{}: define an alias for root in {}'.format(
+    sys.argv[0], aliases),
         file = sys.stderr)
   exit(1)
 
@@ -61,6 +71,6 @@ server = WSGIServer(
     numthreads=64)
 
 try:
-    server.start()
+  server.start()
 except KeyboardInterrupt:
-    server.stop()
+  server.stop()
