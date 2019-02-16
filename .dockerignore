@@ -1,1 +1,5 @@
+.dockerignore
+.gitignore
+Dockerfile
+Dockerfile.ci
 __pycache__
