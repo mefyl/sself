@@ -10,8 +10,8 @@ RUN apk --no-cache add nginx py3-requests py3-yaml
 RUN rm /etc/nginx/conf.d/default.conf
 RUN mkdir /run/nginx
 RUN chown nginx:nginx /run/nginx
-ADD proxy /root/proxy
-ENTRYPOINT /root/proxy
+ADD proxy.py /root/proxy.py
+ENTRYPOINT /root/proxy.py
 
 
 FROM base AS certbot

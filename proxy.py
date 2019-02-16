@@ -8,14 +8,45 @@ import subprocess
 import sys
 import time
 
-def configuration():
-  with open('/etc/sself.yml') as f:
+class Configuration:
+
+  def __init__(self, path = None, content = None):
+    '''Load a Sself configuration.
+
+    >>> cfg = Configuration(content = """
+    ... domains:
+    ...   www-infinit-sh:
+    ...     hosts:
+    ...     - infinit.sh.gruntech.org
+    ...     port: 8080
+    ...   www-mefyl-name:
+    ...     hosts:
+    ...     - mefyl.name
+    ... """) #doctest: +ELLIPSIS
+    >>> cfg['certbot']['host']
+    'sself-certbot'
+    >>> cfg['certbot']['port']
+    80
+    >>> sorted(cfg['hostnames'])
+    ['infinit.sh.gruntech.org', 'mefyl.name']
+    '''
     import yaml
-    res = yaml.load(f)
-  certbot = res.setdefault('certbot', {})
-  certbot.setdefault('host', 'sself-certbot')
-  certbot.setdefault('port', 80)
-  return res
+    if path is not None:
+      assert content is None
+      with open(path, 'r') as f:
+        self.__yaml = yaml.load(f)
+    else:
+      assert content is not None
+      self.__yaml = yaml.load(content)
+    certbot = self.__yaml.setdefault('certbot', {})
+    certbot.setdefault('host', 'sself-certbot')
+    certbot.setdefault('port', 80)
+    self.__yaml['hostnames'] = list(
+      itertools.chain(*(s['hosts'] for s in self.__yaml['domains'].values())))
+
+  def __getitem__(self, attr):
+    return self.__yaml[attr]
+
 
 def log(msg, **kwargs):
   print('{}: {}'.format(sys.argv[0], msg), **kwargs)
@@ -27,7 +58,7 @@ def run(cmd):
 letsencrypt_template = '''\
 server {{
   listen 80;
-  server_name {hostnames};
+  server_name {hosts};
   access_log /dev/stdout;
   error_log /dev/stdout info;
   location ~ ^/.well-known {{
@@ -56,11 +87,10 @@ server {{
 }}'''
 
 def main():
-  cfg = configuration()
+  cfg = Configuration(path = '/etc/sself.yml')
   with open('/etc/nginx/conf.d/letsencrypt.conf', 'w') as f:
     print(letsencrypt_template.format(
-      hostnames = ' '.join(*itertools.chain(s['hosts']
-                                            for s in cfg['domains'].values())),
+      hosts = ' '.join(cfg['hostnames']),
       **cfg,
     ), file = f)
   nginx = subprocess.Popen(['nginx', '-g', 'daemon off;'])
@@ -102,8 +132,9 @@ def main():
     except subprocess.TimeoutExpired:
       log('refreshing certificates')
 
-try:
-  main()
-except Exception as e:
-  log('fatal error: {}'.format(e), file = sys.stderr)
-  exit(1)
+if __name__ == "__main__":
+  try:
+    main()
+  except Exception as e:
+    log('fatal error: {}'.format(e), file = sys.stderr)
+    exit(1)
