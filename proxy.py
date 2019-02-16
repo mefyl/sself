@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import collections
 import itertools
 import os
 import os.path
@@ -8,7 +9,7 @@ import subprocess
 import sys
 import time
 
-class Configuration:
+class Configuration(collections.Mapping):
 
   def __init__(self, path = None, content = None):
     '''Load a Sself configuration.
@@ -23,10 +24,8 @@ class Configuration:
     ...     hosts:
     ...     - mefyl.name
     ... """) #doctest: +ELLIPSIS
-    >>> cfg['certbot']['host']
-    'sself-certbot'
-    >>> cfg['certbot']['port']
-    80
+    >>> '{certbot[host]}:{certbot[port]}'.format(**cfg)
+    'sself-certbot:80'
     >>> sorted(cfg['hostnames'])
     ['infinit.sh.gruntech.org', 'mefyl.name']
     '''
@@ -47,6 +46,11 @@ class Configuration:
   def __getitem__(self, attr):
     return self.__yaml[attr]
 
+  def __iter__(self):
+    return iter(self.__yaml)
+
+  def __len__(self):
+    return len(self.__yaml)
 
 def log(msg, **kwargs):
   print('{}: {}'.format(sys.argv[0], msg), **kwargs)
