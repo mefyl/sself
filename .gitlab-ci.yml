@@ -46,8 +46,13 @@ Deploy to production:
     - export DOCKER_TLS_VERIFY=1
     - export DOCKER_CERT_PATH="$DOCKER_CONFIG"
     - export DOCKER_HOST=157.230.19.225:2376
-    - docker service update sself-lb --image "$CI_REGISTRY/mefyl/sself/lb:$(git describe)"
-    - docker service update sself-certbot --image "$CI_REGISTRY/mefyl/sself/certbot:$(git describe)"
+    - TAG=$(git describe)
+    - sed "s/:latest/:$TAG/" stack.yml > sself.yml
+    - docker stack deploy  --with-registry-auth -c sself.yml sself
+  artifacts:
+    name: "${CI_JOB_STAGE}_${CI_COMMIT_REF_NAME}"
+    paths:
+      - sself.yml
   environment:
     name: production
     url: http://production.gruntech.org
