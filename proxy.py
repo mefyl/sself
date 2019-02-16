@@ -11,10 +11,10 @@ import time
 
 class Configuration(collections.Mapping):
 
-  def __init__(self, path = None, content = None):
+  def __init__(self, content):
     '''Load a Sself configuration.
 
-    >>> cfg = Configuration(content = """
+    >>> cfg = Configuration("""
     ... domains:
     ...   www-infinit-sh:
     ...     hosts:
@@ -30,13 +30,7 @@ class Configuration(collections.Mapping):
     ['infinit.sh.gruntech.org', 'mefyl.name']
     '''
     import yaml
-    if path is not None:
-      assert content is None
-      with open(path, 'r') as f:
-        self.__yaml = yaml.load(f)
-    else:
-      assert content is not None
-      self.__yaml = yaml.load(content)
+    self.__yaml = yaml.load(content)
     certbot = self.__yaml.setdefault('certbot', {})
     certbot.setdefault('host', 'sself-certbot')
     certbot.setdefault('port', 80)
@@ -91,7 +85,8 @@ server {{
 }}'''
 
 def main():
-  cfg = Configuration(path = '/etc/sself.yml')
+  with open('/etc/sself.yml') as f:
+    cfg = Configuration(f)
   with open('/etc/nginx/conf.d/letsencrypt.conf', 'w') as f:
     print(letsencrypt_template.format(
       hosts = ' '.join(cfg['hostnames']),
