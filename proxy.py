@@ -25,14 +25,14 @@ class Configuration(collections.Mapping):
     ...     - mefyl.name
     ... """) #doctest: +ELLIPSIS
     >>> '{certbot[host]}:{certbot[port]}'.format(**cfg)
-    'sself-certbot:80'
+    'sself_certbot:80'
     >>> sorted(cfg['hostnames'])
     ['infinit.sh.gruntech.org', 'mefyl.name']
     '''
     import yaml
     self.__yaml = yaml.load(content)
     certbot = self.__yaml.setdefault('certbot', {})
-    certbot.setdefault('host', 'sself-certbot')
+    certbot.setdefault('host', 'sself_certbot')
     certbot.setdefault('port', 80)
     self.__yaml['hostnames'] = list(
       itertools.chain(*(s['hosts'] for s in self.__yaml['domains'].values())))
