@@ -1,6 +1,7 @@
 stages:
   - Check
   - Containerize
+  - Deploy
 
 before_script:
   - TAG=$(git describe)
@@ -31,3 +32,25 @@ Certbot:
     - make DOCKER_REPOSITORY=registry.gitlab.gruntech.org/mefyl/sself/ DOCKER_TAG=$TAG image/certbot
     - if ! docker --config "$PWD/.docker" push "$NAME"; then docker rmi "$NAME"; exit 1; fi
     - docker rmi "$NAME"
+
+Deploy to production:
+  stage: Deploy
+  image: registry.gitlab.gruntech.org/mefyl/sself/ci
+  dependencies:
+    - Certbot
+    - Load Balancer
+  script:
+    - export DOCKER_CONFIG="$PWD/.docker"
+    - mkdir -p "$DOCKER_CONFIG"
+    - echo "$DOCKER_CERTS" | base64 -d | tar xvz -C "$DOCKER_CONFIG"
+    - export DOCKER_TLS_VERIFY=1
+    - export DOCKER_CERT_PATH="$DOCKER_CONFIG"
+    - export DOCKER_HOST=157.230.19.225:2376
+    - docker service update sself-lb --image "$CI_REGISTRY/mefyl/sself/lb:$(git describe)"
+    - docker service update sself-certbot --image "$CI_REGISTRY/mefyl/sself/certbot:$(git describe)"
+  environment:
+    name: production
+    url: http://production.gruntech.org
+  only:
+    - master
+  when: manual
