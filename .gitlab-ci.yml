@@ -1,12 +1,19 @@
 stages:
-  - docker
+  - Check
+  - Containerize
 
 before_script:
   - TAG=$(git describe)
   - docker --config "$PWD/.docker" login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
 
+Check:
+  stage: Check
+  image: registry.gitlab.gruntech.org/mefyl/sself/ci
+  script:
+    - make check
+
 Load Balancer:
-  stage: docker
+  stage: Containerize
   image: registry.gitlab.gruntech.org/mefyl/sself/ci
   script:
     - IMAGE="$CI_REGISTRY/mefyl/sself/lb"
@@ -16,7 +23,7 @@ Load Balancer:
     - docker rmi "$NAME"
 
 Certbot:
-  stage: docker
+  stage: Containerize
   image: registry.gitlab.gruntech.org/mefyl/sself/ci
   script:
     - IMAGE="$CI_REGISTRY/mefyl/sself/certbot"
