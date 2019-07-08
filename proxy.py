@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import collections
+import datetime
 import itertools
 import os
 import os.path
+import random
 import requests
 import subprocess
 import sys
@@ -93,6 +95,7 @@ def main():
       **cfg,
     ), file = f)
   nginx = subprocess.Popen(['nginx', '-g', 'daemon off;'])
+  random.seed()
   while True:
     for service, c in cfg['domains'].items():
       for h in c['hosts']:
@@ -127,7 +130,10 @@ def main():
             port = c.get('port', 80)), file = f)
     run(['nginx', '-s', 'reload'])
     try:
-      exit(nginx.wait())
+      # Make the refresh interval slightly random, to avoid all replicas refreshing at the same
+      # time.
+      timeout = datetime.timedelta(days = 7, seconds = random.randrange(600))
+      exit(nginx.wait(timeout = int(timeout.total_seconds())))
     except subprocess.TimeoutExpired:
       log('refreshing certificates')
 
