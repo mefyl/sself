@@ -6,6 +6,7 @@ stages:
 before_script:
   - TAG=$(git describe)
   - docker --config "$PWD/.docker" login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+  - docker --config "$PWD/.docker" login -u mefyl -p "$DOCKER_HUB_TOKEN"
 
 Check:
   stage: Check
@@ -21,7 +22,11 @@ Load Balancer:
     - NAME="$IMAGE:$TAG"
     - make DOCKER_REPOSITORY=registry.gitlab.gruntech.org/mefyl/sself/ DOCKER_TAG=$TAG image/lb
     - if ! docker --config "$PWD/.docker" push "$NAME"; then docker rmi "$NAME"; exit 1; fi
+    - DOCKER_NAME="mefyl/sself-lb:$TAG"
+    - docker tag "$NAME" "$DOCKER_NAME"
     - docker rmi "$NAME"
+    - if ! docker --config "$PWD/.docker" push "$DOCKER_NAME"; then docker rmi "DOCKER_$NAME"; exit 1; fi
+    - docker rmi "$DOCKER_NAME"
 
 Certbot:
   stage: Containerize
@@ -31,7 +36,12 @@ Certbot:
     - NAME="$IMAGE:$TAG"
     - make DOCKER_REPOSITORY=registry.gitlab.gruntech.org/mefyl/sself/ DOCKER_TAG=$TAG image/certbot
     - if ! docker --config "$PWD/.docker" push "$NAME"; then docker rmi "$NAME"; exit 1; fi
+    - DOCKER_NAME="mefyl/sself-certbot:$TAG"
+    - docker tag "$NAME" "$DOCKER_NAME"
     - docker rmi "$NAME"
+    - if ! docker --config "$PWD/.docker" push "$DOCKER_NAME"; then docker rmi "DOCKER_$NAME"; exit 1; fi
+    - docker rmi "$DOCKER_NAME"
+
 
 Deploy to production:
   stage: Deploy
